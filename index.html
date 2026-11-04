@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101b1b">
+  <title>Night Shift — A tiny driving game</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #101b1b;
+      --panel: #182625;
+      --road: #303b39;
+      --line: #71817a;
+      --cream: #f2eddb;
+      --muted: #9eaaa0;
+      --lime: #d6f36a;
+      --coral: #ff765e;
+      --sky: #95d5cb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      overflow-x: hidden;
+      background-color: var(--ink);
+      background-image: radial-gradient(ellipse at 50% 42%, #263a34 0%, var(--ink) 70%);
+      color: var(--cream);
+      font-family: "Trebuchet MS", "Arial Narrow", sans-serif;
+    }
+
+    .cabinet {
+      width: min(100% - 32px, 430px);
+      padding: 22px 22px 18px;
+      border: 1px solid #536359;
+      background: #14201f;
+      box-shadow: 0 18px 70px #080f0eaa, inset 0 0 0 5px #0e1716;
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 2px 14px;
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--sky);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--cream);
+      font-family: Impact, "Arial Narrow", sans-serif;
+      font-size: 30px;
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .scoreboard {
+      display: flex;
+      gap: 18px;
+      text-align: right;
+    }
+
+    .score-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+    }
+
+    .score-value {
+      color: var(--lime);
+      font-family: Impact, "Arial Narrow", sans-serif;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .track-wrap {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #65746b;
+      background: #24302e;
+      aspect-ratio: 3 / 4;
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #101b1bcc;
+      text-align: center;
+      transition: opacity 180ms ease;
+    }
+
+    .overlay[hidden] { display: none; }
+
+    .overlay-content { max-width: 245px; }
+
+    .overlay h2 {
+      margin: 0 0 8px;
+      color: var(--lime);
+      font-family: Impact, "Arial Narrow", sans-serif;
+      font-size: clamp(32px, 10vw, 46px);
+      font-weight: 400;
+      line-height: 0.96;
+      text-transform: uppercase;
+    }
+
+    .overlay p {
+      margin: 0 0 20px;
+      color: var(--cream);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 2px;
+      background: var(--lime);
+      color: var(--ink);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .start-button { padding: 0 24px; }
+    button:focus-visible { outline: 3px solid var(--cream); outline-offset: 3px; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding-top: 12px;
+    }
+
+    .steer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      border: 1px solid #52645c;
+      background: #1c2a27;
+      color: var(--cream);
+      font-size: 11px;
+      letter-spacing: 1px;
+      touch-action: manipulation;
+      user-select: none;
+    }
+
+    .steer:active { background: #344a40; }
+    .arrow { color: var(--lime); font-size: 16px; }
+
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 2px 0;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .status strong { color: var(--sky); font-weight: 700; }
+
+    @media (max-height: 700px) and (min-width: 500px) {
+      .cabinet { width: min(100% - 32px, 350px); padding: 16px; }
+      header { padding-bottom: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="cabinet" aria-label="Night Shift car game">
+    <header>
+      <div>
+        <p class="eyebrow">After hours arcade</p>
+        <h1>Night Shift</h1>
+      </div>
+      <div class="scoreboard" aria-live="polite">
+        <div><span class="score-label">SCORE</span><span class="score-value" id="score">0000</span></div>
+        <div><span class="score-label">BEST</span><span class="score-value" id="best">0000</span></div>
+      </div>
+    </header>
+
+    <section class="track-wrap" aria-label="Racing game">
+      <canvas id="game" aria-label="Three-lane road. Dodge traffic by changing lanes."></canvas>
+      <div class="overlay" id="overlay">
+        <div class="overlay-content">
+          <h2 id="overlay-title">Clock in.<br>Floor it.</h2>
+          <p id="overlay-copy">Three lanes. Endless traffic. How far can you make it?</p>
+          <button class="start-button" id="start">Start driving</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="controls" aria-label="Steering controls">
+      <button class="steer" id="left" aria-label="Steer left"><span class="arrow" aria-hidden="true">&#8592;</span> LEFT</button>
+      <button class="steer" id="right" aria-label="Steer right">RIGHT <span class="arrow" aria-hidden="true">&#8594;</span></button>
+    </div>
+    <div class="status"><span>ARROWS / A D TO STEER</span><strong id="gear">READY</strong><span>DON'T CRASH</span></div>
+  </main>
+
+  <script>
+    (() => {
+      const canvas = document.getElementById("game");
+      const context = canvas.getContext("2d");
+      const track = document.querySelector(".track-wrap");
+      const overlay = document.getElementById("overlay");
+      const overlayTitle = document.getElementById("overlay-title");
+      const overlayCopy = document.getElementById("overlay-copy");
+      const startButton = document.getElementById("start");
+      const scoreDisplay = document.getElementById("score");
+      const bestDisplay = document.getElementById("best");
+      const gearDisplay = document.getElementById("gear");
+      const laneCount = 3;
+      const playerY = 0.76;
+      const colors = ["#ff765e", "#e4c45c", "#95d5cb", "#b3a5db"];
+      let width = 0;
+      let height = 0;
+      let lane = 1;
+      let traffic = [];
+      let roadOffset = 0;
+      let distance = 0;
+      let lastTime = 0;
+      let spawnClock = 0;
+      let playing = false;
+      let animationFrame = 0;
+      let best = Number(localStorage.getItem("night-shift-best") || 0);
+
+      bestDisplay.textContent = String(best).padStart(4, "0");
+
+      function resize() {
+        const bounds = track.getBoundingClientRect();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        width = bounds.width;
+        height = bounds.height;
+        canvas.width = Math.round(width * ratio);
+        canvas.height = Math.round(height * ratio);
+        context.setTransform(ratio, 0, 0, ratio, 0, 0);
+        draw();
+      }
+
+      function laneCenter(index) {
+        const roadLeft = width * 0.16;
+        const roadWidth = width * 0.68;
+        return roadLeft + roadWidth * (index + 0.5) / laneCount;
+      }
+
+      function drawCar(centerX, top, carWidth, carHeight, color, player = false) {
+        const x = centerX - carWidth / 2;
+        context.fillStyle = "#101615";
+        context.fillRect(x - carWidth * 0.12, top + carHeight * 0.2, carWidth * 0.18, carHeight * 0.25);
+        context.fillRect(x + carWidth * 0.94, top + carHeight * 0.2, carWidth * 0.18, carHeight * 0.25);
+        context.fillRect(x - carWidth * 0.12, top + carHeight * 0.65, carWidth * 0.18, carHeight * 0.22);
+        context.fillRect(x + carWidth * 0.94, top + carHeight * 0.65, carWidth * 0.18, carHeight * 0.22);
+        context.fillStyle = color;
+        context.beginPath();
+        context.roundRect(x, top, carWidth, carHeight, carWidth * 0.2);
+        context.fill();
+        context.fillStyle = player ? "#b9e8d0" : "#d2d7c6";
+        context.beginPath();
+        context.roundRect(x + carWidth * 0.2, top + carHeight * 0.16, carWidth * 0.6, carHeight * 0.25, carWidth * 0.1);
+        context.fill();
+        context.fillStyle = player ? "#fff0a0" : "#ffedaa";
+        context.fillRect(x + carWidth * 0.12, top + carHeight * 0.05, carWidth * 0.18, carHeight * 0.07);
+        context.fillRect(x + carWidth * 0.7, top + carHeight * 0.05, carWidth * 0.18, carHeight * 0.07);
+        context.fillStyle = player ? "#f45c50" : "#a84b42";
+        context.fillRect(x + carWidth * 0.12, top + carHeight * 0.88, carWidth * 0.18, carHeight * 0.06);
+        context.fillRect(x + carWidth * 0.7, top + carHeight * 0.88, carWidth * 0.18, carHeight * 0.06);
+      }
+
+      function draw() {
+        if (!width || !height) return;
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = "#263b34";
+        context.fillRect(0, 0, width, height);
+
+        for (let y = -40; y < height + 40; y += 54) {
+          const offsetY = (y + roadOffset * 0.6) % (height + 54);
+          context.fillStyle = "#415847";
+          context.fillRect(width * 0.035, offsetY, width * 0.045, 16);
+          context.fillRect(width * 0.92, offsetY + 25, width * 0.045, 16);
+          context.fillStyle = "#84966a";
+          context.fillRect(width * 0.05, offsetY + 4, width * 0.016, 4);
+          context.fillRect(width * 0.935, offsetY + 29, width * 0.016, 4);
+        }
+
+        const roadLeft = width * 0.16;
+        const roadWidth = width * 0.68;
+        context.fillStyle = "#303b39";
+        context.fillRect(roadLeft, 0, roadWidth, height);
+        context.fillStyle = "#9ba181";
+        context.fillRect(roadLeft, 0, 3, height);
+        context.fillRect(roadLeft + roadWidth - 3, 0, 3, height);
+
+        for (let divider = 1; divider < laneCount; divider += 1) {
+          const lineX = roadLeft + roadWidth * divider / laneCount;
+          for (let y = -42; y < height + 42; y += 56) {
+            context.fillStyle = "#839088";
+            context.fillRect(lineX - 1, (y + roadOffset) % (height + 56), 2, 27);
+          }
+        }
+
+        const carWidth = roadWidth / laneCount * 0.48;
+        const carHeight = carWidth * 1.7;
+        for (const car of traffic) {
+          const y = car.y * height;
+          drawCar(laneCenter(car.lane), y, carWidth, carHeight, car.color);
+        }
+        drawCar(laneCenter(lane), height * playerY, carWidth, carHeight, "#d6f36a", true);
+      }
+
+      function spawnTraffic() {
+        const openLanes = [0, 1, 2].filter((candidate) =>
+          !traffic.some((car) => car.lane === candidate && car.y < 0.26)
+        );
+        if (!openLanes.length) return;
+        const chosen = openLanes[Math.floor(Math.random() * openLanes.length)];
+        traffic.push({ lane: chosen, y: -0.18, color: colors[Math.floor(Math.random() * colors.length)] });
+      }
+
+      function tick(time) {
+        if (!playing) return;
+        const delta = Math.min((time - lastTime) / 1000 || 0, 0.04);
+        lastTime = time;
+        const speed = 0.48 + Math.min(distance / 90, 0.5);
+        distance += delta * speed * 10;
+        roadOffset = (roadOffset + delta * height * speed) % (height + 56);
+        spawnClock += delta;
+        if (spawnClock > Math.max(0.55, 1.15 - distance / 140)) {
+          spawnTraffic();
+          spawnClock = 0;
+        }
+
+        const playerCarY = height * playerY;
+        const carHeight = width * 0.68 / laneCount * 0.48 * 1.7;
+        for (const car of traffic) {
+          car.y += delta * speed;
+          if (car.lane === lane && car.y * height + carHeight * 0.82 > playerCarY && car.y * height < playerCarY + carHeight * 0.75) {
+            endGame();
+            return;
+          }
+        }
+        traffic = traffic.filter((car) => car.y < 1.15);
+        scoreDisplay.textContent = String(Math.floor(distance * 10)).padStart(4, "0");
+        draw();
+        animationFrame = requestAnimationFrame(tick);
+      }
+
+      function startGame() {
+        cancelAnimationFrame(animationFrame);
+        lane = 1;
+        traffic = [];
+        distance = 0;
+        roadOffset = 0;
+        spawnClock = 0;
+        lastTime = performance.now();
+        playing = true;
+        scoreDisplay.textContent = "0000";
+        gearDisplay.textContent = "DRIVE";
+        overlay.hidden = true;
+        animationFrame = requestAnimationFrame(tick);
+      }
+
+      function endGame() {
+        playing = false;
+        const score = Math.floor(distance * 10);
+        if (score > best) {
+          best = score;
+          localStorage.setItem("night-shift-best", String(best));
+          bestDisplay.textContent = String(best).padStart(4, "0");
+        }
+        gearDisplay.textContent = "CRASH";
+        overlayTitle.innerHTML = "Shift over.";
+        overlayCopy.textContent = `You scored ${score}. Fancy another run?`;
+        startButton.textContent = "Drive again";
+        overlay.hidden = false;
+      }
+
+      function steer(direction) {
+        if (playing) lane = Math.max(0, Math.min(laneCount - 1, lane + direction));
+      }
+
+      startButton.addEventListener("click", startGame);
+      document.getElementById("left").addEventListener("pointerdown", () => steer(-1));
+      document.getElementById("right").addEventListener("pointerdown", () => steer(1));
+      window.addEventListener("keydown", (event) => {
+        if (["ArrowLeft", "ArrowRight", "a", "A", "d", "D", " "].includes(event.key)) event.preventDefault();
+        if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") steer(-1);
+        if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") steer(1);
+        if ((event.key === "Enter" || event.key === " ") && !playing) startGame();
+      });
+
+      let touchStartX = null;
+      track.addEventListener("pointerdown", (event) => { touchStartX = event.clientX; });
+      track.addEventListener("pointerup", (event) => {
+        if (touchStartX === null) return;
+        const distanceX = event.clientX - touchStartX;
+        if (Math.abs(distanceX) > 24) steer(distanceX < 0 ? -1 : 1);
+        touchStartX = null;
+      });
+      track.addEventListener("pointercancel", () => { touchStartX = null; });
+      window.addEventListener("resize", resize);
+      resize();
+    })();
+  </script>
+</body>
+</html>
